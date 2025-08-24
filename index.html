@@ -86,7 +86,7 @@
                 map.removeLayer(geojsonLayer);
             }
             // The fetch will fail for now, which is expected.
-            fetch('frankfurt-data.geojson')
+            fetch('dummy-data.geojson')
                 .then(response => {
                     if (!response.ok) {
                         console.log("Waiting for frankfurt-data.geojson file...");
