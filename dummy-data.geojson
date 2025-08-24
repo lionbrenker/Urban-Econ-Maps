@@ -1,0 +1,45 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "DISTRICT_NAME": "Test District A",
+        "housing_price": 4500,
+        "population_density": 3000
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [8.65, 50.12],
+            [8.70, 50.12],
+            [8.70, 50.15],
+            [8.65, 50.15],
+            [8.65, 50.12]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "DISTRICT_NAME": "Test District B",
+        "housing_price": 8100,
+        "population_density": 9500
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [8.71, 50.12],
+            [8.76, 50.12],
+            [8.76, 50.15],
+            [8.71, 50.15],
+            [8.71, 50.12]
+          ]
+        ]
+      }
+    }
+  ]
+}
