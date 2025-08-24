@@ -64,51 +64,96 @@
     </div>
 
     <script>
-        // --- THIS JAVASCRIPT SECTION IS A PLACEHOLDER FOR THE NEXT PHASE ---
-        // --- IT WILL NOT FULLY WORK UNTIL YOU ADD THE GEOJSON DATA   ---
-
         // 1. Initialize the map centered on Frankfurt
-        var map = L.map('map').setView([50.1109, 8.6821], 12); // Centered on Frankfurt
-
-        // Add a base tile layer
+        var map = L.map('map').setView([50.1109, 8.6821], 12);
+        
+        // 2. Add a base tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
-
-        // NOTE: The rest of this script is the logic for loading your data.
-        // It will only work once you have found and uploaded your `frankfurt-data.geojson` file.
-        // For now, it will simply show the base map and the panel.
-
+        
+        // 3. Global variable to hold the GeoJSON layer, so we can interact with it
         var geojsonLayer;
-
+        
+        // --- MAIN FUNCTION TO DRAW THE MAP ---
         function drawMap(data_property) {
+            
             if (geojsonLayer) {
                 map.removeLayer(geojsonLayer);
             }
-            // The fetch will fail for now, which is expected.
+        
             fetch('dummy-data.geojson')
-                .then(response => {
-                    if (!response.ok) {
-                        console.log("Waiting for frankfurt-data.geojson file...");
-                        return;
-                    }
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    if (!data) return;
-                    geojsonLayer = L.geoJSON(data, { /* ... styling logic will go here ... */ }).addTo(map);
+                    geojsonLayer = L.geoJSON(data, {
+                        style: function(feature) {
+                            var value = feature.properties[data_property];
+                            return {
+                                fillColor: getColor(value, data_property),
+                                weight: 2,
+                                opacity: 1,
+                                color: 'white',
+                                dashArray: '3',
+                                fillOpacity: 0.7
+                            };
+                        },
+                        onEachFeature: function(feature, layer) {
+                            layer.on({
+                                mouseover: highlightFeature,
+                                mouseout: resetHighlight,
+                            });
+                            layer.bindPopup('<b>' + feature.properties.DISTRICT_NAME + '</b><br>' + data_property + ': ' + feature.properties[data_property]);
+                        }
+                    }).addTo(map);
                 });
         }
-
+        
+        // --- HELPER FUNCTIONS ---
+        
+        function getColor(value, property) {
+            if (property === 'housing_price') {
+                return value > 8000 ? '#800026' :
+                       value > 7000 ? '#BD0026' :
+                       value > 6000 ? '#E31A1C' :
+                       value > 5000 ? '#FC4E2A' :
+                       value > 4000 ? '#FD8D3C' :
+                                      '#FFEDA0';
+            }
+            if (property === 'population_density') {
+                return value > 8000  ? '#084594' :
+                       value > 6000  ? '#2171B5' :
+                       value > 4000  ? '#4292C6' :
+                       value > 2000  ? '#6BAED6' :
+                                       '#9ECAE1';
+            }
+            return '#CCCCCC';
+        }
+        
+        function highlightFeature(e) {
+            var layer = e.target;
+            layer.setStyle({
+                weight: 5,
+                color: '#666',
+                dashArray: '',
+                fillOpacity: 0.7
+            });
+            layer.bringToFront();
+        }
+        
+        function resetHighlight(e) {
+            geojsonLayer.resetStyle(e.target);
+        }
+        
+        // --- EVENT LISTENERS FOR THE CONTROL PANEL ---
+        
         var layerControls = document.querySelectorAll('input[name="layer"]');
         layerControls.forEach(function(radio) {
             radio.addEventListener('change', function() {
-                // This will be ready to work once the data is available
                 drawMap(this.value);
             });
         });
-
-        // Initial call
+        
+        // --- INITIAL MAP DRAW ---
         drawMap('housing_price');
 
     </script>
