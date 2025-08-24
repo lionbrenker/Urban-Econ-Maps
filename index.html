@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Interactive Map</title>
+    <title>Urban Econ Maps</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
@@ -15,55 +15,103 @@
      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
      crossorigin=""></script>
      
-    <!-- Style to set the map's size -->
+    <!-- Our New Styles -->
     <style>
-        #map { height: 100vh; } /* Set map to full screen height */
-        body { padding: 0; margin: 0; } /* Remove default spacing */
+        /* Make the page and map fill the entire screen */
+        body { 
+            padding: 0; 
+            margin: 0; 
+            font-family: sans-serif;
+        }
+        html, body, #map {
+            height: 100%;
+            width: 100vw;
+        }
+
+        /* This is the new style for our floating panel */
+        #panel {
+            position: absolute; /* This is key: it takes the panel out of the normal flow */
+            top: 10px;          /* 10 pixels from the top */
+            right: 10px;        /* 10 pixels from the right */
+            z-index: 1000;      /* Ensures it's on top of the map tiles */
+            background: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            width: 250px;
+        }
+        
+        h2, h4 {
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
 
-<!-- This is where the map will be displayed -->
-<div id="map"></div>
+    <!-- The map container, which will fill the whole page -->
+    <div id="map"></div>
 
-<script>
-    // 1. Initialize the map and set its view
-    var map = L.map('map').setView([50.115894052727576, 8.68021584872115], 13);
+    <!-- The HTML for our new floating control panel -->
+    <div id="panel">
+        <h2>Frankfurt Data</h2>
+        <div class="layer-control">
+            <h4>Select Data Layer:</h4>
+            <input type="radio" id="housing" name="layer" value="housing_price" checked>
+            <label for="housing">Housing Prices (€/m²)</label><br>
+            <input type="radio" id="population" name="layer" value="population_density">
+            <label for="population">Population Density</label><br>
+        </div>
+    </div>
 
-    // 2. Add the background tile layer from OpenStreetMap
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+    <script>
+        // --- THIS JAVASCRIPT SECTION IS A PLACEHOLDER FOR THE NEXT PHASE ---
+        // --- IT WILL NOT FULLY WORK UNTIL YOU ADD THE GEOJSON DATA   ---
 
-    // 3. Define your location data
-    var geojsonData = {
-        "type": "FeatureCollection",
-        "features": [
-            {
-                "type": "Feature",
-                "properties": { "name": "Big Ben", "description": "The famous clock tower." },
-                "geometry": { "type": "Point", "coordinates": [-0.1246, 51.5007] }
-            },
-            {
-                "type": "Feature",
-                "properties": { "name": "Westminster Abbey", "description": "A large, mainly Gothic abbey church." },
-                "geometry": { "type": "Point", "coordinates": [-0.1276, 51.4994] }
-            },
-            {
-                "type": "Feature",
-                "properties": { "name": "St. Paul's Cathedral", "description": "An Anglican cathedral in London." },
-                "geometry": { "type": "Point", "coordinates": [-0.0984, 51.5138] }
+        // 1. Initialize the map centered on Frankfurt
+        var map = L.map('map').setView([50.1109, 8.6821], 12); // Centered on Frankfurt
+
+        // Add a base tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // NOTE: The rest of this script is the logic for loading your data.
+        // It will only work once you have found and uploaded your `frankfurt-data.geojson` file.
+        // For now, it will simply show the base map and the panel.
+
+        var geojsonLayer;
+
+        function drawMap(data_property) {
+            if (geojsonLayer) {
+                map.removeLayer(geojsonLayer);
             }
-        ]
-    };
-
-    // 4. Add the GeoJSON data to the map as markers
-    L.geoJSON(geojsonData, {
-        onEachFeature: function (feature, layer) {
-            layer.bindPopup('<b>' + feature.properties.name + '</b><br>' + feature.properties.description);
+            // The fetch will fail for now, which is expected.
+            fetch('frankfurt-data.geojson')
+                .then(response => {
+                    if (!response.ok) {
+                        console.log("Waiting for frankfurt-data.geojson file...");
+                        return;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data) return;
+                    geojsonLayer = L.geoJSON(data, { /* ... styling logic will go here ... */ }).addTo(map);
+                });
         }
-    }).addTo(map);
-</script>
+
+        var layerControls = document.querySelectorAll('input[name="layer"]');
+        layerControls.forEach(function(radio) {
+            radio.addEventListener('change', function() {
+                // This will be ready to work once the data is available
+                drawMap(this.value);
+            });
+        });
+
+        // Initial call
+        drawMap('housing_price');
+
+    </script>
 
 </body>
 </html>
