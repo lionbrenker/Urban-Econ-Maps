@@ -102,7 +102,7 @@
                                 mouseover: highlightFeature,
                                 mouseout: resetHighlight,
                             });
-                            layer.bindPopup('<b>' + feature.properties.DISTRICT_NAME + '</b><br>' + data_property + ': ' + feature.properties[data_property]);
+                            layer.bindPopup('<b>' + feature.properties.name + '</b>');
                         }
                     }).addTo(map);
                 });
