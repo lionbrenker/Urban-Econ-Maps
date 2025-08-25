@@ -82,7 +82,7 @@
                 map.removeLayer(geojsonLayer);
             }
         
-            fetch('dummy-data.geojson')
+            fetch('frankfurt_stadtteile.geojson')
                 .then(response => response.json())
                 .then(data => {
                     geojsonLayer = L.geoJSON(data, {
