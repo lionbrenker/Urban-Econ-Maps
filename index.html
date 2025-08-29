@@ -14,7 +14,6 @@
     
     <!-- Our New Styles -->
     <style>
-        <style>
         body { margin: 0; padding: 0; font-family: sans-serif; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
         #panel {
@@ -69,61 +68,56 @@
         // --- 2. CITY SELECTION LOGIC ---
         const cityDropdown = document.getElementById('city-dropdown');
         
-        // This function will be called once the GeoJSON is loaded
         function populateDropdown(geojsonData) {
-            // Clear any existing options
             cityDropdown.innerHTML = '';
         
-            // --- NEW: Create a sorted copy of the features ---
             const sortedFeatures = [...geojsonData.features].sort((a, b) => {
-                // Using the key you provided: krs_name_short
-                const nameA = a.properties.krs_name_short;
-                const nameB = b.properties.krs_name_short;
-                // localeCompare is the best way to sort strings alphabetically, especially in German
+                // --- NEW: More robust way to get names, handles missing properties ---
+                const nameA = a.properties.krs_name_short || ''; // Use empty string if name is missing
+                const nameB = b.properties.krs_name_short || '';
                 return nameA.localeCompare(nameB);
             });
-            // --- End of new code ---
         
-            // Loop through the NEW sorted array
             sortedFeatures.forEach(feature => {
-                const option = document.createElement('option');
                 const regionName = feature.properties.krs_name_short;
-                
-                // The value is now the region's name, not its index
-                option.value = regionName;
-                option.innerText = regionName;
-                cityDropdown.appendChild(option);
+                // --- NEW: Don't add options that don't have a name ---
+                if (regionName) {
+                    const option = document.createElement('option');
+                    option.value = regionName;
+                    option.innerText = regionName;
+                    cityDropdown.appendChild(option);
+                }
             });
         
-            // --- ADD THIS LINE AT THE VERY END OF THE FUNCTION ---
-            selectRegionByName(cityDropdown.value); // Select the first item in the now-populated list
+            // It's safer to call this after a tiny delay, ensuring the browser has updated the DOM
+            setTimeout(() => {
+                if (cityDropdown.value) {
+                    selectRegionByName(cityDropdown.value);
+                }
+            }, 0);
         }
         
         
         // Function to handle city selection change (now finds by name)
         function selectRegionByName(name) {
-            if (!allRegionsData) return; // Make sure data is loaded
+            if (!allRegionsData) return;
         
-            // --- NEW: Find the feature in our original data that has the matching name ---
             const selectedFeature = allRegionsData.features.find(feature => feature.properties.krs_name_short === name);
         
+            // --- NEW: Add a check to make sure the feature was found before continuing ---
             if (!selectedFeature) {
-                console.error("Could not find region:", name);
-                return;
+                console.error("Could not find feature for region:", name);
+                return; 
             }
-            // --- End of new code ---
         
-            // Use Turf.js to calculate the center of the selected region
             const center = turf.centerOfMass(selectedFeature).geometry.coordinates;
         
-            // Smoothly move the map to the new region's center
             map.flyTo({
                 center: center,
                 zoom: 9,
                 essential: true
             });
         
-            // Update the 'city-border-source' with ONLY the selected region's data
             map.getSource('city-border-source').setData(selectedFeature.geometry);
         }
         
