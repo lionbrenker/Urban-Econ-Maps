@@ -74,23 +74,40 @@
             // Clear any existing options
             cityDropdown.innerHTML = '';
         
-            // Loop through each feature (region) in the data
-            geojsonData.features.forEach((feature, index) => {
+            // --- NEW: Create a sorted copy of the features ---
+            const sortedFeatures = [...geojsonData.features].sort((a, b) => {
+                // Using the key you provided: krs_name_short
+                const nameA = a.properties.krs_name_short;
+                const nameB = b.properties.krs_name_short;
+                // localeCompare is the best way to sort strings alphabetically, especially in German
+                return nameA.localeCompare(nameB);
+            });
+            // --- End of new code ---
+        
+            // Loop through the NEW sorted array
+            sortedFeatures.forEach(feature => {
                 const option = document.createElement('option');
-                // The value will be the feature's index in the array
-                option.value = index; 
-                // The text will be the region's name
-                // !!! IMPORTANT: CHANGE 'GEN' to the correct property name from your file !!!
-                option.innerText = feature.properties.krs_name_short; 
+                const regionName = feature.properties.krs_name_short;
+                
+                // The value is now the region's name, not its index
+                option.value = regionName;
+                option.innerText = regionName;
                 cityDropdown.appendChild(option);
             });
         }
         
-        // Function to handle city selection change
-        function selectRegionByIndex(index) {
+        // Function to handle city selection change (now finds by name)
+        function selectRegionByName(name) {
             if (!allRegionsData) return; // Make sure data is loaded
         
-            const selectedFeature = allRegionsData.features[index];
+            // --- NEW: Find the feature in our original data that has the matching name ---
+            const selectedFeature = allRegionsData.features.find(feature => feature.properties.krs_name_short === name);
+        
+            if (!selectedFeature) {
+                console.error("Could not find region:", name);
+                return;
+            }
+            // --- End of new code ---
         
             // Use Turf.js to calculate the center of the selected region
             const center = turf.centerOfMass(selectedFeature).geometry.coordinates;
@@ -98,7 +115,7 @@
             // Smoothly move the map to the new region's center
             map.flyTo({
                 center: center,
-                zoom: 9, // A reasonable zoom level for a single region
+                zoom: 9,
                 essential: true
             });
         
@@ -106,9 +123,9 @@
             map.getSource('city-border-source').setData(selectedFeature.geometry);
         }
         
-        // Listen for changes on the dropdown
+        // Change it to this:
         cityDropdown.addEventListener('change', (e) => {
-            selectRegionByIndex(e.target.value);
+            selectRegionByName(e.target.value);
         });
         
         
@@ -136,7 +153,7 @@
                     console.log("GeoJSON data loaded successfully");
                     allRegionsData = data; // Store the data globally
                     populateDropdown(allRegionsData); // Populate the dropdown
-                    selectRegionByIndex(0); // Select the first region in the list by default
+                    selectRegionByName(cityDropdown.value);
                 });
                 
             // --- CLICK HANDLER CAN REMAIN FOR FUTURE USE ---
