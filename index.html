@@ -36,6 +36,13 @@
     <!-- The HTML for our new floating control panel -->
     <div id="panel">
         <h2>Frankfurt Data</h2>
+        
+        <div id="city-selector">
+            <h4>Select City:</h4>
+            <select id="city-dropdown" style="width: 100%;"></select>
+        </div>
+        <hr> <!-- This adds a nice dividing line -->
+        
         <div class="layer-control">
             <h4>Select Data Layer:</h4>
             <input type="radio" id="housing" name="layer" value="housing_price" checked>
@@ -46,67 +53,128 @@
     </div>
 
     <script>
+        // --- DATA FOR OUR CITIES ---
+        const CITIES = {
+            'frankfurt': {
+                name: 'Frankfurt',
+                center: [8.6821, 50.1109], // [longitude, latitude]
+                zoom: 11,
+                border_file: 'frankfurt-border.geojson'
+            },
+            'berlin': {
+                name: 'Berlin',
+                center: [13.4050, 52.5200],
+                zoom: 10,
+                border_file: 'berlin-border.geojson' // (You would need to create this file)
+            }
+            // Add more cities here in the future
+        };
+                
         // --- 1. INITIALIZE THE MAP ---
         const map = new maplibregl.Map({
-            container: 'map', // The ID of our map div
-            style: `https://api.maptiler.com/maps/streets/style.json?key=8UPX2x4HfWayBX8z6OFn`, // The map style URL
-            center: [8.6821, 50.1109], // Frankfurt's coordinates [longitude, latitude]
-            zoom: 15 // Start zoomed in enough to see buildings
+            container: 'map',
+            style: `https://api.maptiler.com/maps/streets/style.json?key=YOUR_API_KEY_HERE`,
+            center: CITIES.frankfurt.center, // Start at our default city
+            zoom: CITIES.frankfurt.zoom
         });
         
-        let selectedBuildingId = null;
-        let selectedRoadId = null;
         
-        // --- 2. ADD INTERACTIVITY ---
+        // --- 2. CITY SELECTION LOGIC ---
+        const cityDropdown = document.getElementById('city-dropdown');
+        
+        // Populate the dropdown from our CITIES object
+        for (const cityKey in CITIES) {
+            const option = document.createElement('option');
+            option.value = cityKey;
+            option.innerText = CITIES[cityKey].name;
+            cityDropdown.appendChild(option);
+        }
+        
+        // Function to handle city selection change
+        function selectCity(cityKey) {
+            const city = CITIES[cityKey];
+            
+            // Smoothly move the map to the new city
+            map.flyTo({
+                center: city.center,
+                zoom: city.zoom,
+                essential: true // This ensures the animation happens
+            });
+        
+            // Fetch and display the city's border
+            fetch(city.border_file)
+                .then(response => response.json())
+                .then(data => {
+                    // Update the 'city-border-source' with the new data
+                    map.getSource('city-border-source').setData(data);
+                });
+        }
+        
+        // Listen for changes on the dropdown
+        cityDropdown.addEventListener('change', (e) => {
+            selectCity(e.target.value);
+        });
+        
+        
+        // --- 3. MAP LOAD AND INTERACTIVITY SETUP ---
         map.on('load', () => {
-            // The map's style has fully loaded. Now we can add our interactivity.
         
-            // Add a new, empty data source for our selected building highlight
-            map.addSource('highlight-building', { 'type': 'geojson', 'data': { 'type': 'FeatureCollection', 'features': [] } });
-            // Add a new layer to display the highlight
+            // --- SETUP SOURCES AND LAYERS ---
+            // Source and layer for the city border
+            map.addSource('city-border-source', { 'type': 'geojson', 'data': null });
+            map.addLayer({
+                'id': 'city-border-layer',
+                'type': 'line',
+                'source': 'city-border-source',
+                'paint': { 'line-color': '#0000ff', 'line-width': 4, 'line-dasharray': [2, 2] }
+            });
+        
+            // Source and layer for highlighting buildings
+            map.addSource('highlight-building-source', { 'type': 'geojson', 'data': null });
             map.addLayer({
                 'id': 'highlight-building-layer',
                 'type': 'fill',
-                'source': 'highlight-building',
+                'source': 'highlight-building-source',
                 'paint': { 'fill-color': '#f08', 'fill-opacity': 0.6 }
             });
         
-            // Add a new, empty data source for our selected road highlight
-            map.addSource('highlight-road', { 'type': 'geojson', 'data': { 'type': 'FeatureCollection', 'features': [] } });
-            // Add a new layer to display the highlight
+            // Source and layer for highlighting roads
+            map.addSource('highlight-road-source', { 'type': 'geojson', 'data': null });
             map.addLayer({
                 'id': 'highlight-road-layer',
                 'type': 'line',
-                'source': 'highlight-road',
+                'source': 'highlight-road-source',
                 'paint': { 'line-color': '#33f', 'line-width': 4 }
             });
         
+            // --- SETUP INITIAL STATE ---
+            // Select the first city in the dropdown by default
+            selectCity(cityDropdown.value);
         
-            // Listen for a click event on the map
+        
+            // --- SETUP CLICK HANDLER (IMPROVED VERSION) ---
             map.on('click', (e) => {
-                // Use queryRenderedFeatures to check what was clicked
-                const features = map.queryRenderedFeatures(e.point, {
-                    layers: ['building', 'road_major', 'road_minor', 'road_street'] // The layer IDs for buildings and roads
-                });
+                // More comprehensive list of possible vector tile layers
+                const possibleLayers = ['building', 'building-3d', 'road_major', 'road_minor', 'road_street', 'road_motorway', 'road_path', 'transportation'];
+                const features = map.queryRenderedFeatures(e.point, { layers: possibleLayers });
         
-                // If nothing was clicked, do nothing
-                if (!features.length) {
-                    return;
+                if (!features.length) { 
+                    // Clear highlights if nothing was clicked
+                    map.getSource('highlight-building-source').setData({ 'type': 'FeatureCollection', 'features': [] });
+                    map.getSource('highlight-road-source').setData({ 'type': 'FeatureCollection', 'features': [] });
+                    return; 
                 }
         
                 const clickedFeature = features[0];
                 const layerId = clickedFeature.layer.id;
-        
-                // Logic for highlighting a building
-                if (layerId === 'building') {
-                    map.getSource('highlight-building').setData(clickedFeature.geometry);
-                    map.getSource('highlight-road').setData({ 'type': 'FeatureCollection', 'features': [] }); // Clear road highlight
-                }
-        
-                // Logic for highlighting a road
-                if (layerId.startsWith('road')) {
-                    map.getSource('highlight-road').setData(clickedFeature.geometry);
-                    map.getSource('highlight-building').setData({ 'type': 'FeatureCollection', 'features': [] }); // Clear building highlight
+                
+                // Use 'includes' for more robust matching
+                if (layerId.includes('building')) {
+                    map.getSource('highlight-building-source').setData(clickedFeature.geometry);
+                    map.getSource('highlight-road-source').setData({ 'type': 'FeatureCollection', 'features': [] });
+                } else if (layerId.includes('road') || layerId.includes('transportation')) {
+                    map.getSource('highlight-road-source').setData(clickedFeature.geometry);
+                    map.getSource('highlight-building-source').setData({ 'type': 'FeatureCollection', 'features': [] });
                 }
             });
         });
