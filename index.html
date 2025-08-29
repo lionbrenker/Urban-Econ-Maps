@@ -9,6 +9,8 @@
     <link href='https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css' rel='stylesheet' />
     <!-- MapLibre GL JS -->
     <script src='https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js'></script>
+    <!-- Turf.js for GIS operations -->
+    <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
     
     <!-- Our New Styles -->
     <style>
@@ -53,74 +55,66 @@
     </div>
 
     <script>
-        // --- DATA FOR OUR CITIES ---
-        const CITIES = {
-            'frankfurt': {
-                name: 'Frankfurt',
-                center: [8.6821, 50.1109], // [longitude, latitude]
-                zoom: 11,
-                border_file: 'frankfurt-border.geojson'
-            },
-            'berlin': {
-                name: 'Berlin',
-                center: [13.4050, 52.5200],
-                zoom: 10,
-                border_file: 'berlin-border.geojson' // (You would need to create this file)
-            }
-            // Add more cities here in the future
-        };
-                
         // --- 1. INITIALIZE THE MAP ---
         const map = new maplibregl.Map({
             container: 'map',
             style: `https://api.maptiler.com/maps/streets/style.json?key=8UPX2x4HfWayBX8z6OFn`,
-            center: CITIES.frankfurt.center, // Start at our default city
-            zoom: CITIES.frankfurt.zoom
+            center: [10.4515, 51.1657], // Center of Germany
+            zoom: 5 // Zoomed out to see the whole country
         });
         
+        // --- GLOBAL VARIABLE to hold all our region data ---
+        let allRegionsData = null;
         
         // --- 2. CITY SELECTION LOGIC ---
         const cityDropdown = document.getElementById('city-dropdown');
         
-        // Populate the dropdown from our CITIES object
-        for (const cityKey in CITIES) {
-            const option = document.createElement('option');
-            option.value = cityKey;
-            option.innerText = CITIES[cityKey].name;
-            cityDropdown.appendChild(option);
+        // This function will be called once the GeoJSON is loaded
+        function populateDropdown(geojsonData) {
+            // Clear any existing options
+            cityDropdown.innerHTML = '';
+        
+            // Loop through each feature (region) in the data
+            geojsonData.features.forEach((feature, index) => {
+                const option = document.createElement('option');
+                // The value will be the feature's index in the array
+                option.value = index; 
+                // The text will be the region's name
+                // !!! IMPORTANT: CHANGE 'GEN' to the correct property name from your file !!!
+                option.innerText = feature.properties.krs_name_short; 
+                cityDropdown.appendChild(option);
+            });
         }
         
         // Function to handle city selection change
-        function selectCity(cityKey) {
-            const city = CITIES[cityKey];
-            
-            // Smoothly move the map to the new city
+        function selectRegionByIndex(index) {
+            if (!allRegionsData) return; // Make sure data is loaded
+        
+            const selectedFeature = allRegionsData.features[index];
+        
+            // Use Turf.js to calculate the center of the selected region
+            const center = turf.centerOfMass(selectedFeature).geometry.coordinates;
+        
+            // Smoothly move the map to the new region's center
             map.flyTo({
-                center: city.center,
-                zoom: city.zoom,
-                essential: true // This ensures the animation happens
+                center: center,
+                zoom: 9, // A reasonable zoom level for a single region
+                essential: true
             });
         
-            // Fetch and display the city's border
-            fetch(city.border_file)
-                .then(response => response.json())
-                .then(data => {
-                    // Update the 'city-border-source' with the new data
-                    map.getSource('city-border-source').setData(data);
-                });
+            // Update the 'city-border-source' with ONLY the selected region's data
+            map.getSource('city-border-source').setData(selectedFeature.geometry);
         }
         
         // Listen for changes on the dropdown
         cityDropdown.addEventListener('change', (e) => {
-            selectCity(e.target.value);
+            selectRegionByIndex(e.target.value);
         });
         
         
-        // --- 3. MAP LOAD AND INTERACTIVITY SETUP ---
+        // --- 3. MAP LOAD AND DATA FETCHING ---
         map.on('load', () => {
-        
-            // --- SETUP SOURCES AND LAYERS ---
-            // Source and layer for the city border
+            // --- SETUP SOURCES AND LAYERS (these are initially empty) ---
             map.addSource('city-border-source', { 'type': 'geojson', 'data': null });
             map.addLayer({
                 'id': 'city-border-layer',
@@ -128,53 +122,34 @@
                 'source': 'city-border-source',
                 'paint': { 'line-color': '#0000ff', 'line-width': 4, 'line-dasharray': [2, 2] }
             });
-        
-            // Source and layer for highlighting buildings
+            
+            // (The highlight layers can remain for future use)
             map.addSource('highlight-building-source', { 'type': 'geojson', 'data': null });
-            map.addLayer({
-                'id': 'highlight-building-layer',
-                'type': 'fill',
-                'source': 'highlight-building-source',
-                'paint': { 'fill-color': '#f08', 'fill-opacity': 0.6 }
-            });
-        
-            // Source and layer for highlighting roads
+            map.addLayer({ 'id': 'highlight-building-layer', 'type': 'fill', 'source': 'highlight-building-source', 'paint': { 'fill-color': '#f08', 'fill-opacity': 0.6 }});
             map.addSource('highlight-road-source', { 'type': 'geojson', 'data': null });
-            map.addLayer({
-                'id': 'highlight-road-layer',
-                'type': 'line',
-                'source': 'highlight-road-source',
-                'paint': { 'line-color': '#33f', 'line-width': 4 }
-            });
+            map.addLayer({ 'id': 'highlight-road-layer', 'type': 'line', 'source': 'highlight-road-source', 'paint': { 'line-color': '#33f', 'line-width': 4 }});
         
-            // --- SETUP INITIAL STATE ---
-            // Select the first city in the dropdown by default
-            selectCity(cityDropdown.value);
-        
-        
-            // --- SETUP CLICK HANDLER (IMPROVED VERSION) ---
+            // --- FETCH THE MAIN GEOJSON DATA ---
+            fetch('germany-regions.geojson')
+                .then(response => response.json())
+                .then(data => {
+                    console.log("GeoJSON data loaded successfully");
+                    allRegionsData = data; // Store the data globally
+                    populateDropdown(allRegionsData); // Populate the dropdown
+                    selectRegionByIndex(0); // Select the first region in the list by default
+                });
+                
+            // --- CLICK HANDLER CAN REMAIN FOR FUTURE USE ---
             map.on('click', (e) => {
-                // More comprehensive list of possible vector tile layers
                 const possibleLayers = ['building', 'building-3d', 'road_major', 'road_minor', 'road_street', 'road_motorway', 'road_path', 'transportation'];
                 const features = map.queryRenderedFeatures(e.point, { layers: possibleLayers });
-        
-                if (!features.length) { 
-                    // Clear highlights if nothing was clicked
-                    map.getSource('highlight-building-source').setData({ 'type': 'FeatureCollection', 'features': [] });
-                    map.getSource('highlight-road-source').setData({ 'type': 'FeatureCollection', 'features': [] });
-                    return; 
-                }
-        
+                if (!features.length) { return; }
                 const clickedFeature = features[0];
                 const layerId = clickedFeature.layer.id;
-                
-                // Use 'includes' for more robust matching
                 if (layerId.includes('building')) {
                     map.getSource('highlight-building-source').setData(clickedFeature.geometry);
-                    map.getSource('highlight-road-source').setData({ 'type': 'FeatureCollection', 'features': [] });
                 } else if (layerId.includes('road') || layerId.includes('transportation')) {
                     map.getSource('highlight-road-source').setData(clickedFeature.geometry);
-                    map.getSource('highlight-building-source').setData({ 'type': 'FeatureCollection', 'features': [] });
                 }
             });
         });
