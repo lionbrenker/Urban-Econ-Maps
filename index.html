@@ -94,7 +94,11 @@
                 option.innerText = regionName;
                 cityDropdown.appendChild(option);
             });
+        
+            // --- ADD THIS LINE AT THE VERY END OF THE FUNCTION ---
+            selectRegionByName(cityDropdown.value); // Select the first item in the now-populated list
         }
+        
         
         // Function to handle city selection change (now finds by name)
         function selectRegionByName(name) {
@@ -152,8 +156,9 @@
                 .then(data => {
                     console.log("GeoJSON data loaded successfully");
                     allRegionsData = data; // Store the data globally
-                    populateDropdown(allRegionsData); // Populate the dropdown
-                    selectRegionByName(cityDropdown.value);
+                    
+                    // This function will now also handle the initial selection
+                    populateDropdown(allRegionsData); 
                 });
                 
             // --- CLICK HANDLER CAN REMAIN FOR FUTURE USE ---
