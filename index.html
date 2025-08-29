@@ -105,9 +105,9 @@
         function selectRegionByName(name) {
             if (!allRegionsData) return;
         
-            const selectedFeature = allRegionsData.features.find(feature => feature.properties.krs_name_short === name);
+            // --- THE FIX: Convert the property to a String before comparing ---
+            const selectedFeature = allRegionsData.features.find(feature => String(feature.properties.krs_name_short) === name);
         
-            // --- NEW: Add a check to make sure the feature was found before continuing ---
             if (!selectedFeature) {
                 console.error("Could not find feature for region:", name);
                 return; 
