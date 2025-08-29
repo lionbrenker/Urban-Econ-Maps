@@ -71,16 +71,20 @@
         function populateDropdown(geojsonData) {
             cityDropdown.innerHTML = '';
         
+            if (!geojsonData || !geojsonData.features) {
+                console.error("GeoJSON data is invalid or has no features.");
+                return;
+            }
+        
             const sortedFeatures = [...geojsonData.features].sort((a, b) => {
-                // --- NEW: More robust way to get names, handles missing properties ---
-                const nameA = a.properties.krs_name_short || ''; // Use empty string if name is missing
-                const nameB = b.properties.krs_name_short || '';
+                // --- THE FIX: Convert values to Strings BEFORE comparing ---
+                const nameA = String(a.properties.krs_name_short || '');
+                const nameB = String(b.properties.krs_name_short || '');
                 return nameA.localeCompare(nameB);
             });
         
             sortedFeatures.forEach(feature => {
                 const regionName = feature.properties.krs_name_short;
-                // --- NEW: Don't add options that don't have a name ---
                 if (regionName) {
                     const option = document.createElement('option');
                     option.value = regionName;
@@ -89,7 +93,6 @@
                 }
             });
         
-            // It's safer to call this after a tiny delay, ensuring the browser has updated the DOM
             setTimeout(() => {
                 if (cityDropdown.value) {
                     selectRegionByName(cityDropdown.value);
