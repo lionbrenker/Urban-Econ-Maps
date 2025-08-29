@@ -156,16 +156,32 @@
                 });
                 
             // --- CLICK HANDLER CAN REMAIN FOR FUTURE USE ---
+            // --- NEW, MORE RELIABLE CLICK HANDLER ---
             map.on('click', (e) => {
-                const possibleLayers = ['building', 'building-3d', 'road_major', 'road_minor', 'road_street', 'road_motorway', 'road_path', 'transportation'];
-                const features = map.queryRenderedFeatures(e.point, { layers: possibleLayers });
-                if (!features.length) { return; }
-                const clickedFeature = features[0];
-                const layerId = clickedFeature.layer.id;
-                if (layerId.includes('building')) {
-                    map.getSource('highlight-building-source').setData(clickedFeature.geometry);
-                } else if (layerId.includes('road') || layerId.includes('transportation')) {
-                    map.getSource('highlight-road-source').setData(clickedFeature.geometry);
+                // Query all features at the clicked point, without specifying layers
+                const features = map.queryRenderedFeatures(e.point);
+            
+                // If no features were clicked, clear any existing highlights and stop
+                if (!features.length) {
+                    map.getSource('highlight-building-source').setData({ 'type': 'FeatureCollection', 'features': [] });
+                    map.getSource('highlight-road-source').setData({ 'type': 'FeatureCollection', 'features': [] });
+                    return;
+                }
+            
+                // The vector tiles have "source-layers" which are more stable than style layer names.
+                // We look for the first feature that comes from the 'building' or 'transportation' source-layer.
+                const buildingFeature = features.find(f => f.layer['source-layer'] === 'building');
+                const roadFeature = features.find(f => f.layer['source-layer'] === 'transportation');
+            
+                // Prioritize highlighting the building if one was found
+                if (buildingFeature) {
+                    map.getSource('highlight-building-source').setData(buildingFeature.geometry);
+                    map.getSource('highlight-road-source').setData({ 'type': 'FeatureCollection', 'features': [] }); // Clear road highlight
+                } 
+                // Otherwise, highlight the road if one was found
+                else if (roadFeature) {
+                    map.getSource('highlight-road-source').setData(roadFeature.geometry);
+                    map.getSource('highlight-building-source').setData({ 'type': 'FeatureCollection', 'features': [] }); // Clear building highlight
                 }
             });
         });
