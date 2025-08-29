@@ -99,8 +99,7 @@
                 }
             }, 0);
         }
-        
-        
+
         function selectRegionByName(name) {
             if (!allRegionsData) return;
         
@@ -115,36 +114,43 @@
         
             map.flyTo({
                 center: center,
-                zoom: 9,
+                zoom: 12, // Zoom in a bit closer to better see the effect
                 essential: true
             });
         
+            // Update the border layer
             map.getSource('city-border-source').setData(selectedFeature.geometry);
         
-            // --- NEW MASK AND COLORING LOGIC ---
+            // --- NEW LOGIC TO FIND AND DISPLAY BUILDINGS IN THE REGION ---
         
-            // 1. Color all visible buildings blue
-            if (map.getLayer('building')) {
-                map.setPaintProperty('building', 'fill-color', '#3388ff');
+            // Clear the layer from the previous selection
+            map.getSource('buildings-in-region-source').setData({ 'type': 'FeatureCollection', 'features': [] });
+        
+            // Get all the features from the vector tiles' 'building' source layer
+            // This is a powerful command that gives us the raw data
+            const allBuildingFeatures = map.querySourceFeatures('composite', {
+                sourceLayer: 'building'
+            });
+        
+            const buildingsInRegion = [];
+        
+            // Loop through every building feature the map can see
+            for (const building of allBuildingFeatures) {
+                // For performance, we check if the center point of the building is inside the region
+                // This is much faster than checking the whole polygon shape.
+                const buildingCenter = turf.centerOfMass(building);
+                if (turf.booleanPointInPolygon(buildingCenter, selectedFeature)) {
+                    buildingsInRegion.push(building);
+                }
             }
-            if (map.getLayer('building-3d')) {
-                map.setPaintProperty('building-3d', 'fill-color', '#3388ff');
-            }
         
-            // 2. Create the mask shape
-            // Define a huge polygon that covers the entire world
-            const world = {
-                "type": "Polygon",
-                "coordinates": [
-                    [[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]
-                ]
-            };
-            // Use Turf.js to subtract the selected region's shape from the world,
-            // creating a "donut" polygon.
-            const maskPolygon = turf.difference(world, selectedFeature.geometry);
+            console.log(`Found ${buildingsInRegion.length} buildings inside ${name}.`);
         
-            // 3. Update the mask layer with this new shape
-            map.getSource('mask-source').setData(maskPolygon);
+            // Update our new blue layer with only the buildings we found
+            map.getSource('buildings-in-region-source').setData({
+                'type': 'FeatureCollection',
+                'features': buildingsInRegion
+            });
         }
         
         // Change it to this:
@@ -163,24 +169,18 @@
                 'source': 'city-border-source',
                 'paint': { 'line-color': '#0000ff', 'line-width': 4, 'line-dasharray': [2, 2] }
             });
-            
-            // Source and layer for the "rest of the world" mask
-            map.addSource('mask-source', { 'type': 'geojson', 'data': null });
+
+            // Source and layer for drawing ONLY the buildings inside the selected region
+            map.addSource('buildings-in-region-source', { 'type': 'geojson', 'data': null });
             map.addLayer({
-                'id': 'mask-layer',
+                'id': 'buildings-in-region-layer',
                 'type': 'fill',
-                'source': 'mask-source',
+                'source': 'buildings-in-region-source',
                 'paint': {
-                    'fill-color': '#cccccc', // A light gray color
-                    'fill-opacity': 0.5    // Semi-transparent
+                    'fill-color': '#3388ff', // The blue color
+                    'fill-opacity': 0.8
                 }
-            });
-            
-            // (The highlight layers can remain for future use)
-            map.addSource('highlight-building-source', { 'type': 'geojson', 'data': null });
-            map.addLayer({ 'id': 'highlight-building-layer', 'type': 'fill', 'source': 'highlight-building-source', 'paint': { 'fill-color': '#f08', 'fill-opacity': 0.6 }});
-            map.addSource('highlight-road-source', { 'type': 'geojson', 'data': null });
-            map.addLayer({ 'id': 'highlight-road-layer', 'type': 'line', 'source': 'highlight-road-source', 'paint': { 'line-color': '#33f', 'line-width': 4 }});
+            }, 'city-border-layer'); // This optional argument places the blue buildings UNDER the border line
         
             // --- FETCH THE MAIN GEOJSON DATA ---
             fetch('germany-regions.geojson')
