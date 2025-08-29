@@ -101,11 +101,9 @@
         }
         
         
-        // Function to handle city selection change (now finds by name)
         function selectRegionByName(name) {
             if (!allRegionsData) return;
         
-            // --- THE FIX: Convert the property to a String before comparing ---
             const selectedFeature = allRegionsData.features.find(feature => String(feature.properties.krs_name_short) === name);
         
             if (!selectedFeature) {
@@ -122,6 +120,31 @@
             });
         
             map.getSource('city-border-source').setData(selectedFeature.geometry);
+        
+            // --- NEW MASK AND COLORING LOGIC ---
+        
+            // 1. Color all visible buildings blue
+            if (map.getLayer('building')) {
+                map.setPaintProperty('building', 'fill-color', '#3388ff');
+            }
+            if (map.getLayer('building-3d')) {
+                map.setPaintProperty('building-3d', 'fill-color', '#3388ff');
+            }
+        
+            // 2. Create the mask shape
+            // Define a huge polygon that covers the entire world
+            const world = {
+                "type": "Polygon",
+                "coordinates": [
+                    [[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]
+                ]
+            };
+            // Use Turf.js to subtract the selected region's shape from the world,
+            // creating a "donut" polygon.
+            const maskPolygon = turf.difference(world, selectedFeature.geometry);
+        
+            // 3. Update the mask layer with this new shape
+            map.getSource('mask-source').setData(maskPolygon);
         }
         
         // Change it to this:
@@ -139,6 +162,18 @@
                 'type': 'line',
                 'source': 'city-border-source',
                 'paint': { 'line-color': '#0000ff', 'line-width': 4, 'line-dasharray': [2, 2] }
+            });
+            
+            // Source and layer for the "rest of the world" mask
+            map.addSource('mask-source', { 'type': 'geojson', 'data': null });
+            map.addLayer({
+                'id': 'mask-layer',
+                'type': 'fill',
+                'source': 'mask-source',
+                'paint': {
+                    'fill-color': '#cccccc', // A light gray color
+                    'fill-opacity': 0.5    // Semi-transparent
+                }
             });
             
             // (The highlight layers can remain for future use)
