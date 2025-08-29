@@ -1,0 +1,18 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "Frankfurt am Main"
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [8.4, 50.0],
+        [8.9, 50.0],
+        [8.9, 50.25],
+        [8.4, 50.25],
+        [8.4, 50.0]
+      ]
+    ]
+  }
+}
