@@ -110,47 +110,47 @@
                 return; 
             }
         
-            const center = turf.centerOfMass(selectedFeature).geometry.coordinates;
+            // Update the border layer immediately
+            map.getSource('city-border-source').setData(selectedFeature.geometry);
         
+            // Fly to the location
             map.flyTo({
-                center: center,
-                zoom: 12, // Zoom in a bit closer to better see the effect
+                center: turf.centerOfMass(selectedFeature).geometry.coordinates,
+                zoom: 12,
                 essential: true
             });
         
-            // Update the border layer
-            map.getSource('city-border-source').setData(selectedFeature.geometry);
+            // --- NEW AND IMPROVED LOGIC ---
+            // Create a function that will run ONLY when the map has finished moving
+            const onMoveEnd = () => {
+                // Now that we've arrived, query for the buildings
+                const allBuildingFeatures = map.querySourceFeatures('composite', {
+                    sourceLayer: 'building'
+                });
         
-            // --- NEW LOGIC TO FIND AND DISPLAY BUILDINGS IN THE REGION ---
+                const buildingsInRegion = [];
         
-            // Clear the layer from the previous selection
-            map.getSource('buildings-in-region-source').setData({ 'type': 'FeatureCollection', 'features': [] });
-        
-            // Get all the features from the vector tiles' 'building' source layer
-            // This is a powerful command that gives us the raw data
-            const allBuildingFeatures = map.querySourceFeatures('composite', {
-                sourceLayer: 'building'
-            });
-        
-            const buildingsInRegion = [];
-        
-            // Loop through every building feature the map can see
-            for (const building of allBuildingFeatures) {
-                // For performance, we check if the center point of the building is inside the region
-                // This is much faster than checking the whole polygon shape.
-                const buildingCenter = turf.centerOfMass(building);
-                if (turf.booleanPointInPolygon(buildingCenter, selectedFeature)) {
-                    buildingsInRegion.push(building);
+                for (const building of allBuildingFeatures) {
+                    // Using turf.booleanPointInPolygon is faster and more reliable
+                    if (turf.booleanPointInPolygon(turf.centerOfMass(building), selectedFeature)) {
+                        buildingsInRegion.push(building);
+                    }
                 }
-            }
         
-            console.log(`Found ${buildingsInRegion.length} buildings inside ${name}.`);
+                console.log(`Found ${buildingsInRegion.length} buildings inside ${name}.`);
         
-            // Update our new blue layer with only the buildings we found
-            map.getSource('buildings-in-region-source').setData({
-                'type': 'FeatureCollection',
-                'features': buildingsInRegion
-            });
+                // Update our blue layer with the buildings we found
+                map.getSource('buildings-in-region-source').setData({
+                    'type': 'FeatureCollection',
+                    'features': buildingsInRegion
+                });
+        
+                // IMPORTANT: Remove this listener so it doesn't run again on the next map move
+                map.off('moveend', onMoveEnd);
+            };
+        
+            // Tell the map to listen for the 'moveend' event and run our function
+            map.on('moveend', onMoveEnd);
         }
         
         // Change it to this:
