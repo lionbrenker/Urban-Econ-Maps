@@ -146,13 +146,24 @@
         
             // --- FETCH THE MAIN GEOJSON DATA ---
             fetch('germany-regions.geojson')
-                .then(response => response.json())
+                .then(response => {
+                    // Check if the file was found
+                    if (!response.ok) {
+                        // If not, throw an error that we can catch
+                        throw new Error(`Could not find file. Server responded with a status of ${response.status}`);
+                    }
+                    // If it was found, try to parse it as JSON
+                    return response.json();
+                })
                 .then(data => {
-                    console.log("GeoJSON data loaded successfully");
-                    allRegionsData = data; // Store the data globally
-                    
-                    // This function will now also handle the initial selection
+                    console.log("GeoJSON data loaded successfully.");
+                    allRegionsData = data;
                     populateDropdown(allRegionsData); 
+                })
+                .catch(error => {
+                    // If anything went wrong in the steps above, this will run
+                    console.error("CRITICAL ERROR LOADING DATA:", error);
+                    alert("Fatal Error: Could not load the germany-regions.geojson file. Please check the developer console for details.");
                 });
                 
             // --- CLICK HANDLER CAN REMAIN FOR FUTURE USE ---
